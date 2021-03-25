@@ -1,7 +1,7 @@
 ;GROUP 16: Abdasalaam Salem, Isabella Robert Llorens, Jamie Booker
 #lang racket
 (require "simpleParser.rkt")
-'''ruby
+
 ;takes a filename that contains the code that is to be sent to the parser
 (define interpret
   (lambda (filename)
@@ -188,4 +188,3 @@
       ((eq? (operator expression) 'var) (M_value (leftoperand expression) (M_state expression state)))
       ((eq? (operator expression) '=) (M_value (leftoperand expression) (M_state expression state)))
       (else (M_boolean expression state))))) ;if the value of expression is either a boolean test (like >=) or if the expression is invalid
-'''
