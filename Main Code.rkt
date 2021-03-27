@@ -106,13 +106,16 @@
 
 ;adds a variable and its value to state, if the value has been declared, but not assigned, its corresponding value is null
 (define Add_M_state
-  (lambda (name value state)
-    (list (cons name (car state)) (cons value (cadr state)))))
+  (lambda (name value state) ;car state = top layer caar state = top layer name's
+    (cons (list (cons name (caar state)) (cons value (cadar state))) (cdr state))))  ;adds the variable by consing the new first layer with the cdr of state
 
 ;removes a variable and its corresponding value from the state by calling the remove function
 (define Remove_M_state
   (lambda (name state)
-    (remove name (car state) (cadr state) '() '())))
+    (cond
+      ((null? state) '())
+      ((is_declared name (caar state)) (cons (remove name (caar state) (cadar state) '() '()) (cdr state)))
+      (else (Remove_M_state name (cdr state))))))
 
 (define block
   (lambda (currline body state)
