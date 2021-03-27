@@ -11,7 +11,9 @@
 ;a last car is added to the tree in case the last line is a while/if with a return statement inside
 (define evaluate-tree
   (lambda (tree)
-     (evaluate-line (car tree) (append (cdr tree) '((null))) '(() ()))))
+     (evaluate-line (car tree) (append (cdr tree) '((null))) initialstate)))
+
+(define initialstate (cons '(() ()) '()))
 
 ;evaluates each line of the tree
 ;if the state is a number, this means there was a return statement inside an if/while statement
