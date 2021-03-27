@@ -73,13 +73,21 @@
       ((eq? (car declare-list) name) (not (eq? (car value-list) 'null))) ;if the name is found in the declare-list and the value is not null, return true
       (else (is_assigned name (cdr declare-list) (cdr value-list))))))
       
+(define get_from_layers
+  (lambda (name state)
+    (cond
+      ((null? state) (error "Not Declared"))
+      ((eq? (get_from_state name (caar state) (cadar state)) 'notdeclared) (get_from_layers name (cdr state)))
+      ((eq? (get_from_state name (caar state) (cadar state)) 'notassigned) (error "Not Assigned"))
+      (else (get_from_state name (caar state) (cadar state))))))
+
 ;reads through the declared/value list bindings and returns the value of the variable if found in declare-list and if it is assigned
 (define get_from_state
   (lambda (name declare-list value-list)
     (cond
-      ((null? declare-list) (error "Not declared"))
-      ((and (eq? name (car declare-list)) (eq? (car value-list) 'null)) (error "Not Assigned")) ;if the binding for variable name is null it is not assigned
-      ((and (eq? name (car declare-list))) (car value-list))                                    ;returns value of name if it has been found
+      ((null? declare-list) 'notdeclared)
+      ((and (eq? name (car declare-list)) (eq? (car value-list) 'null)) 'notassigned) ;if the binding for variable name is null it is not assigned
+      ((eq? name (car declare-list)) (car value-list))                                    ;returns value of name if it has been found
       (else (get_from_state name (cdr declare-list) (cdr value-list))))))
 
 ;returns the value of expression using the state and M_value function
@@ -207,7 +215,7 @@
       ((number? expression) expression)
       ((eq? expression 'true) #t)
       ((eq? expression 'false) #f)
-      ((not (pair? expression)) (get_from_state expression (car state) (cadr state)))
+      ((not (pair? expression)) (get_from_layers expression state))
       ((eq? (operator expression) '+) (+ (M_value (leftoperand expression) state) (M_value (rightoperand expression) state)))
       ((eq? (operator expression) '/) (quotient (M_value (leftoperand expression) state) (M_value (rightoperand expression) state)))
       ((eq? (operator expression) '%) (remainder (M_value (leftoperand expression) state) (M_value (rightoperand expression) state)))
