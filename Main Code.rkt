@@ -99,6 +99,12 @@
   (lambda (name state)
     (remove name (car state) (cadr state) '() '())))
 
+(define block
+  (lambda (currline body state)
+    (cond
+    ((null? body)   (M_state currline state))
+    (else           (block (car body) (cdr body) (M_state currline state)))))) 
+
 ;helper function to remove a variable from state list, if variable isn't found then the original state is returned from a saved list
 (define remove
   (lambda (name declare-list value-list saved-declare saved-value)
@@ -120,12 +126,17 @@
       ((null? expression) state)
       ((not (list? expression)) state)
       ((list? (line-type expression)) (M_state (cdr expression) (M_state (car expression) state)))
+      ((eq? (line-type expression) 'begin) (block (get-firstline expression) (cons(get-body expression) '())state))
       ((eq? (line-type expression) 'return) (return (return-expression expression) state))
       ((eq? (line-type expression) 'var) (declaration (get-name expression) expression state))
       ((eq? (line-type expression) '=) (assignment (get-name expression) (get-expression expression) state))
       ((eq? (line-type expression) 'if) (if-statement (get-condition expression) (get-expression expression) expression state))
       ((eq? (line-type expression) 'while) (while-statement (get-condition expression) (get-expression expression) state))
       (else state))))
+
+(define get-firstline cadr)
+
+(define get-body caddr)
 
 ;gets the condition in a if or while statement
 (define get-condition cadr)
