@@ -36,7 +36,7 @@
 (define assignment
   (lambda (name expression state)
     (if (layered_declare_check name state) ;if name has been declared
-        (cons (priorlist name state) (Add_M_state name (M_value expression state) (Remove_M_state name (M_state expression state)))) ;adds the name with the new value to the state with name removed
+        (append (priorlist name state) (Add_M_state name (M_value expression state) (Remove_M_state name (M_state expression state)))) ;adds the name with the new value to the state with name removed
         (error "Not Declared"))))
 
 (define priorlist
