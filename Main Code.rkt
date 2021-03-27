@@ -35,9 +35,24 @@
 ;assigns variable name to value expression by first removing the variable and its old value from the state and adding it back in with the new value
 (define assignment
   (lambda (name expression state)
-    (if (is_declared name (car state)) ;if name has been declared
-        (Add_M_state name (M_value expression state) (Remove_M_state name (M_state expression state))) ;adds the name with the new value to the state with name removed
+    (if (layered_declare_check name state) ;if name has been declared
+        (cons (priorlist name state) (Add_M_state name (M_value expression state) (Remove_M_state name (M_state expression state)))) ;adds the name with the new value to the state with name removed
         (error "Not Declared"))))
+
+(define priorlist
+  (lambda (name state)
+    (cond
+      ((null? state) '())
+      ((is_declared name (caar state)) '())
+      (else (cons (car state) (priorlist name (cdr state)))))))
+
+(define layered_declare_check
+  (lambda (name state)
+    (cond
+      ((null? state) #f)
+      ((null? (car state)) #f)
+      ((eq? (is_declared name (caar state)) #f) (layered_declare_check name (cdr state)))
+      (else #t))))
 
 ;checks if the variable name has been declared before assignment
 ;gets the declare-list from the state (first sub list)
