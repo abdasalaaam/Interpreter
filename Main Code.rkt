@@ -13,7 +13,7 @@
   (lambda (tree)
      (evaluate-line (car tree) (append (cdr tree) '((null))) initialstate)))
 
-(define initialstate (cons '(() ()) '()))
+(define initialstate '((() ())))
 
 ;evaluates each line of the tree
 ;if the state is a number, this means there was a return statement inside an if/while statement
@@ -136,6 +136,18 @@
       ((eq? name (curr-value declare-list)) (list (append saved-declare (next-value declare-list)) (append saved-value (next-value value-list))))
       (else (remove name (next-value declare-list) (next-value value-list) (cons (curr-value declare-list) saved-declare) (cons (curr-value value-list) saved-value))))))
 
+(define block
+  (lambda (line state)
+    (cond
+      ((null? line) (remove_top state))
+      (else (block (cdr line) (M_state (car line) state))))))
+      
+(define add_top
+  (lambda (state)
+    (cons '(() ()) state)))
+
+(define remove_top cdr)
+
 ;curr-value gets the current value in a list
 (define curr-value car)
 
@@ -149,7 +161,7 @@
       ((null? expression) state)
       ((not (list? expression)) state)
       ((list? (line-type expression)) (M_state (cdr expression) (M_state (car expression) state)))
-      ((eq? (line-type expression) 'begin) (M_state (cdr expression) state))
+      ((eq? (line-type expression) 'begin) (block (cdr expression) (add_top state)))
       ((eq? (line-type expression) 'return) (return (return-expression expression) state))
       ((eq? (line-type expression) 'var) (declaration (get-name expression) expression state))
       ((eq? (line-type expression) '=) (assignment (get-name expression) (get-expression expression) state))
