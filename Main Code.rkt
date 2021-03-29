@@ -169,7 +169,8 @@
       ((eq? (line-type expression) '=) (assignment (get-name expression) (get-expression expression) state))
       ((eq? (line-type expression) 'if) (if-statement (get-condition expression) (get-expression expression) expression state break))
       ((eq? (line-type expression) 'while) (while-statement (get-condition expression) (get-expression expression) state))
-      ((eq? (line-type expression) 'break) (break (M_state '() state break)))
+      ((and (eq? (line-type expression) 'break) (eq? break '())) (error "break not inside loop"))
+      ((eq? (line-type expression) 'break) (break state))
       (else state))))
 
 (define get-firstline cadr)
