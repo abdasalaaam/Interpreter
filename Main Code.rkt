@@ -109,12 +109,14 @@
 ;while condition is true, perform body statement on the state
 (define while-statement
   (lambda (condition body-statement state throw)
-    (if (M_boolean condition (M_state condition state '() throw'() ))
+    (cond
+    ((number? state) state)
+    ((M_boolean condition (M_state condition state '() throw'() ))
         (call/cc
          (lambda (break)
         (while-statement condition body-statement
-                         (call/cc (lambda (continue) (M_state body-statement (M_state condition state break throw continue ) break throw continue ))) throw))) ;if condtion is true, run while statement again on the changed state
-        (M_state condition state '() throw '() )))) 
+                         (call/cc (lambda (continue) (M_state body-statement (M_state condition state break throw continue ) break throw continue ))) throw)))) ;if condtion is true, run while statement again on the changed state
+        (M_state condition state '() throw '() ))))
      
 ;adds a variable and its value to state, if the value has been declared, but not assigned, its corresponding value is null
 (define Add_M_state
@@ -156,7 +158,7 @@
   (lambda (line state break continue)
     (cond
       ((not (number? (try_func (try-line line) state break continue))) (try-without-catch line state break continue))
-      ((and (and (not (null? (catch-line line))) (not (null? (finally-line line))))) (finally (finally-line line) (catch (try_func (try-line line) state break continue) (catch-line line) (add_top state) break) break continue))
+      ((and (and (not (null? (catch-line line))) (not (null? (finally-line line))))) (finally (finally-line line) (catch (try_func (try-line line) state break continue) (catch-line line) (add_top state) break continue) break continue))
       ((and (not (null? (catch-line line))) (null? (finally-line line))) (catch (try_func (try-line line) state break continue) (catch-line line) (add_top state) break))
       ((and (null? (catch-line line)) (not (null? (finally-line line)))) (finally (finally-line line) (try_func (try-line line) state break continue) break continue))
       ((and (null? (catch-line line)) (null? (finally-line line))) (try_func (try-line line) state break continue))
@@ -175,8 +177,8 @@
        (block line (add_top state) break throw continue)))))
 
 (define catch
-  (lambda (throw_value line state break)
-    (block (catch-body line) (Add_M_state (input_param line) throw_value state) break '())))
+  (lambda (throw_value line state break continue)
+    (block (catch-body line) (Add_M_state (input_param line) throw_value state) break '() continue)))
 
 (define finally
   (lambda (line state break continue)
