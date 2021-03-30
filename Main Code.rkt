@@ -48,7 +48,7 @@
       ((is_declared name (caar state)) '())
       (else (cons (car state) (priorlist name (cdr state)))))))
 
-:goes through each layer, starting at the top, to check for variable declarations. Returns a scheme boolean
+;goes through each layer, starting at the top, to check for variable declarations. Returns a scheme boolean
 (define layered_declare_check
   (lambda (name state)
     (cond
