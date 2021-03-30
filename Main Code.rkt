@@ -109,16 +109,15 @@
       (else (M_state (cadddr line) (M_state condition state break throw continue) break throw continue)))))
 
 ;while condition is true, perform body statement on the state
+;while condition is true, perform body statement on the state
 (define while-statement
   (lambda (condition body-statement state throw)
-    (cond
-    ((number? state) state)
-    ((M_boolean condition (M_state condition state '() throw'() ))
+    (if (M_boolean condition (M_state condition state '() throw'() ))
         (call/cc
          (lambda (break)
         (while-statement condition body-statement
-                         (call/cc (lambda (continue) (M_state body-statement (M_state condition state break throw continue ) break throw continue ))) throw)))) ;if condtion is true, run while statement again on the changed state
-        (M_state condition state '() throw '() ))))
+                         (call/cc (lambda (continue) (M_state body-statement (M_state condition state break throw continue ) break throw continue ))) throw))) ;if condtion is true, run while statement again on the changed state
+        (M_state condition state '() throw '() )))) 
      
 ;adds a variable and its value to state, if the value has been declared, but not assigned, its corresponding value is null
 (define Add_M_state
