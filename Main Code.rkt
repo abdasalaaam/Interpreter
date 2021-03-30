@@ -83,9 +83,15 @@
   (lambda (name state)
     (cond
       ((null? state) (error "Not Declared"))
-      ((eq? (get_from_state name (caar state) (cadar state)) 'notdeclared) (get_from_layers name (cdr state)))
-      ((eq? (get_from_state name (caar state) (cadar state)) 'notassigned) (error "Not Assigned"))
-      (else (get_from_state name (caar state) (cadar state))))))
+      ((eq? (get_from_state name (names-list state) (values-list state)) 'notdeclared) (get_from_layers name (cdr state)))
+      ((eq? (get_from_state name (names-list state) (values-list state)) 'notassigned) (error "Not Assigned"))
+      (else (get_from_state name (names-list state) (values-list state))))))
+      
+ ;returns the list of names in the state
+ (define names-list caar)
+ 
+ ;returns the list of values in the state
+ (define values-list caar)
 
 ;reads through the declared/value list bindings and returns the value of the variable if found in declare-list and if it is assigned
 (define get_from_state
