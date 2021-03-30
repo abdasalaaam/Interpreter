@@ -159,7 +159,7 @@
     (cond
       ((not (number? (try_func (try-line line) state break continue))) (try-without-catch line state break continue))
       ((and (and (not (null? (catch-line line))) (not (null? (finally-line line))))) (finally (finally-line line) (catch (try_func (try-line line) state break continue) (catch-line line) (add_top state) break continue) break continue))
-      ((and (not (null? (catch-line line))) (null? (finally-line line))) (catch (try_func (try-line line) state break continue) (catch-line line) (add_top state) break))
+      ((and (not (null? (catch-line line))) (null? (finally-line line))) (catch (try_func (try-line line) state break continue) (catch-line line) (add_top state) break continue))
       ((and (null? (catch-line line)) (not (null? (finally-line line)))) (finally (finally-line line) (try_func (try-line line) state break continue) break continue))
       ((and (null? (catch-line line)) (null? (finally-line line))) (try_func (try-line line) state break continue))
       (else state))))
