@@ -109,13 +109,11 @@
 ;while condition is true, perform body statement on the state
 (define while-statement
   (lambda (condition body-statement state throw)
-    (cond
-    ((number? state) state)
-    ((M_boolean condition (M_state condition state '() throw'() ))
+    (if (M_boolean condition (M_state condition state '() throw'() ))
         (call/cc
          (lambda (break)
         (while-statement condition body-statement
-                         (call/cc (lambda (continue) (M_state body-statement (M_state condition state break throw continue ) break throw continue ))) throw)))) ;if condtion is true, run while statement again on the changed state
+                         (call/cc (lambda (continue) (M_state body-statement (M_state condition state break throw continue ) break throw continue ))) throw))) ;if condtion is true, run while statement again on the changed state
         (M_state condition state '() throw '() )))) 
      
 ;adds a variable and its value to state, if the value has been declared, but not assigned, its corresponding value is null
@@ -155,34 +153,34 @@
     (if (not (list? state)) state (cdr state))))
 
 (define try
-  (lambda (line state break)
+  (lambda (line state break continue)
     (cond
-      ((not (number? (try_func (try-line line) state break))) (try-without-catch line state break))
-      ((and (and (not (null? (catch-line line))) (not (null? (finally-line line))))) (finally (finally-line line) (catch (try_func (try-line line) state break) (catch-line line) (add_top state) break) break))
-      ((and (not (null? (catch-line line))) (null? (finally-line line))) (catch (try_func (try-line line) state break) (catch-line line) (add_top state) break))
-      ((and (null? (catch-line line)) (not (null? (finally-line line)))) (finally (finally-line line) (try_func (try-line line) state break) break))
-      ((and (null? (catch-line line)) (null? (finally-line line))) (try_func (try-line line) state break))
+      ((not (number? (try_func (try-line line) state break continue))) (try-without-catch line state break continue))
+      ((and (and (not (null? (catch-line line))) (not (null? (finally-line line))))) (finally (finally-line line) (catch (try_func (try-line line) state break continue) (catch-line line) (add_top state) break) break continue))
+      ((and (not (null? (catch-line line))) (null? (finally-line line))) (catch (try_func (try-line line) state break continue) (catch-line line) (add_top state) break))
+      ((and (null? (catch-line line)) (not (null? (finally-line line)))) (finally (finally-line line) (try_func (try-line line) state break continue) break continue))
+      ((and (null? (catch-line line)) (null? (finally-line line))) (try_func (try-line line) state break continue))
       (else state))))
 
 (define try-without-catch
-  (lambda (line state break)
+  (lambda (line state break continue)
     (cond
-      ((not (null? (finally-line line))) (finally (finally-line line) (try_func (try-line line) state break) break))
-      (else (try_func (try-line line) state break)))))
+      ((not (null? (finally-line line))) (finally (finally-line line) (try_func (try-line line) state break continue) break continue))
+      (else (try_func (try-line line) state break continue)))))
 
 (define try_func
-  (lambda (line state break)
+  (lambda (line state break continue)
     (call/cc
      (lambda (throw)
-       (block line (add_top state) break throw)))))
+       (block line (add_top state) break throw continue)))))
 
 (define catch
   (lambda (throw_value line state break)
     (block (catch-body line) (Add_M_state (input_param line) throw_value state) break '())))
 
 (define finally
-  (lambda (line state break)
-    (block (finally-body line) (add_top state) break '())))
+  (lambda (line state break continue)
+    (block (finally-body line) (add_top state) break '() continue)))
 
 (define catch-line cadr)
 (define finally-body cadr)
@@ -213,7 +211,7 @@
       ((and (eq? (line-type expression) 'break) (eq? break '())) (error "break not inside loop"))
       ((and (eq? (line-type expression) 'throw) (eq? throw '())) (error "throw not inside try"))
       ((eq? (line-type expression) 'break) (break (remove_top state)))
-      ((eq? (line-type expression) 'try) (try (cdr expression) state break))
+      ((eq? (line-type expression) 'try) (try (cdr expression) state break continue))
       ((eq? (line-type expression) 'throw) (throw (M_value (cadr expression) state)))
       ((eq? (line-type expression) 'continue) (continue (remove_top state)))
       (else state))))
