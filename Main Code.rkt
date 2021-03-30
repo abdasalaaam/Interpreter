@@ -24,7 +24,7 @@
       ((boolean? state) 'false)
       ((null? tree) state)
       ((number? state) state)
-      (else (evaluate-line (car tree) (cdr tree) (M_state line state '()))))))
+      (else (evaluate-line (car tree) (cdr tree) (M_state line state '() '()))))))
       
 ;if value of name is a non number/not a boolean, its undeclared
 ;line - the entire declaration expression
@@ -95,7 +95,7 @@
 ;returns the value of expression using the state and M_value function
 (define return
   (lambda (expression state)
-    (M_value expression (M_state expression state '()))))
+    (M_value expression (M_state expression state '() '()))))
 
 ;if condition is true, perform then-statement on the state
 ;line - entire if-then expression
@@ -198,17 +198,17 @@
 
 ;reterns the state of an expression by calling on its respective function, otherwise the current state will be returned
 (define M_state
-  (lambda (expression state break)
+  (lambda (expression state break throw)
     (cond
       ((null? expression) state)
       ((not (list? expression)) state)
-      ((list? (line-type expression)) (M_state (cdr expression) (M_state (car expression) state break) break))
-      ((eq? (line-type expression) 'begin) (block (cdr expression) (add_top state) break))
+      ((list? (line-type expression)) (M_state (cdr expression) (M_state (car expression) state break throw) break throw))
+      ((eq? (line-type expression) 'begin) (block (cdr expression) (add_top state) break throw))
       ((eq? (line-type expression) 'return) (return (return-expression expression) state))
       ((eq? (line-type expression) 'var) (declaration (get-name expression) expression state))
       ((eq? (line-type expression) '=) (assignment (get-name expression) (get-expression expression) state))
-      ((eq? (line-type expression) 'if) (if-statement (get-condition expression) (get-expression expression) expression state break))
-      ((eq? (line-type expression) 'while) (while-statement (get-condition expression) (get-expression expression) state))
+      ((eq? (line-type expression) 'if) (if-statement (get-condition expression) (get-expression expression) expression state break throw))
+      ((eq? (line-type expression) 'while) (while-statement (get-condition expression) (get-expression expression) state throw))
       ((and (eq? (line-type expression) 'break) (eq? break '())) (error "break not inside loop"))
       ((and (eq? (line-type expression) 'throw) (eq? throw '())) (error "throw not inside try"))
       ((eq? (line-type expression) 'break) (break (remove_top state)))
