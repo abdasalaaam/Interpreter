@@ -48,6 +48,7 @@
       ((is_declared name (caar state)) '())
       (else (cons (car state) (priorlist name (cdr state)))))))
 
+:goes through each layer, starting at the top, to check for variable declarations. Returns a scheme boolean
 (define layered_declare_check
   (lambda (name state)
     (cond
@@ -75,6 +76,7 @@
       ((eq? (car declare-list) name) (not (eq? (car value-list) 'null))) ;if the name is found in the declare-list and the value is not null, return true
       (else (is_assigned name (cdr declare-list) (cdr value-list))))))
       
+;checks all layers, starting from top, for a name and returns its associated value or returns error not assigned
 (define get_from_layers
   (lambda (name state)
     (cond
@@ -139,6 +141,7 @@
       ((eq? name (curr-value declare-list)) (list (append saved-declare (next-value declare-list)) (append saved-value (next-value value-list))))
       (else (remove name (next-value declare-list) (next-value value-list) (cons (curr-value declare-list) saved-declare) (cons (curr-value value-list) saved-value))))))
 
+;recursively reads and returns the MState of lines between brackets/ inside begin statements
 (define block
   (lambda (line state break throw continue)
     (cond
@@ -146,14 +149,17 @@
       ((number? state) state)
       (else (block (cdr line) (M_state (car line) state break throw continue) break throw continue)))))
       
+;simply adds a top layer to the state
 (define add_top
   (lambda (state)
     (cons '(() ()) state)))
 
+;removes the top layer from the state
 (define remove_top
   (lambda (state)
     (if (not (list? state)) state (cdr state))))
 
+;contains the conditions that a try block may encounter and calls the catch/finally/try-without-catch functions accordingly
 (define try
   (lambda (line state break continue)
     (cond
@@ -164,22 +170,26 @@
       ((and (null? (catch-line line)) (null? (finally-line line))) (try_func (try-line line) state break continue))
       (else state))))
 
+;A try without a catch will either only run the try block or run the try block and continue on to the final
 (define try-without-catch
   (lambda (line state break continue)
     (cond
       ((not (null? (finally-line line))) (finally (finally-line line) (try_func (try-line line) state break continue) break continue))
       (else (try_func (try-line line) state break continue)))))
 
+;assess the M_state of the try block function
 (define try_func
   (lambda (line state break continue)
     (call/cc
      (lambda (throw)
        (block line (add_top state) break throw continue)))))
 
+;Evaluates the body of catch blocks by calling the block function
 (define catch
   (lambda (throw_value line state break continue)
     (block (catch-body line) (Add_M_state (input_param line) throw_value state) break '() continue)))
 
+;Evaluates the finally block by calling the block function
 (define finally
   (lambda (line state break continue)
     (block (finally-body line) (add_top state) break '() continue)))
