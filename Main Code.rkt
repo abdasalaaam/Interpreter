@@ -13,6 +13,7 @@
   (lambda (tree)
      (evaluate-line (car tree) (append (cdr tree) '((null))) initialstate)))
 
+;initial state containing only one layer
 (define initialstate '((() ())))
 
 ;evaluates each line of the tree
@@ -41,6 +42,7 @@
         (append (priorlist name state) (Add_M_state name (M_value expression state) (Remove_M_state name (M_state expression state '() '() '())))) ;adds the name with the new value to the state with name removed
         (error "Not Declared"))))
 
+;returns list of layers prior to the first occurence of the layer containing name. Used for assignment helper function
 (define priorlist
   (lambda (name state)
     (cond
@@ -108,7 +110,6 @@
       ((null? (cdddr line)) (M_state condition state break throw continue))
       (else (M_state (cadddr line) (M_state condition state break throw continue) break throw continue)))))
 
-;while condition is true, perform body statement on the state
 ;while condition is true, perform body statement on the state
 (define while-statement
   (lambda (condition body-statement state throw)
@@ -193,11 +194,22 @@
   (lambda (line state break continue)
     (block (finally-body line) (add_top state) break '() continue)))
 
+;entire catch line containing "catch"
 (define catch-line cadr)
+
+;body for finally in the finally statement
 (define finally-body cadr)
+
+;body for catch in the catch statement
 (define catch-body caddr)
+
+;entire finally line containing "finally"
 (define finally-line caddr)
+
+;the (e) in catch (e)
 (define input_param caadr)
+
+;body for the try statement
 (define try-line car)
 
 ;curr-value gets the current value in a list
@@ -226,10 +238,6 @@
       ((eq? (line-type expression) 'throw) (throw (M_value (cadr expression) state)))
       ((eq? (line-type expression) 'continue) (continue (remove_top state)))
       (else state))))
-
-(define get-firstline cadr)
-
-(define get-body caddr)
 
 ;gets the condition in a if or while statement
 (define get-condition cadr)
