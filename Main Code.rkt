@@ -32,13 +32,13 @@
   (lambda (name line state)
     (if (null? (cddr line))
         (Add_M_state name 'null state)                                                  ;if variable name is declared without a value
-        (Add_M_state name (M_value (caddr line) state) (M_state (caddr line) state '()))))) ;if name is declared with a value
+        (Add_M_state name (M_value (caddr line) state) (M_state (caddr line) state '() '()))))) ;if name is declared with a value
 
 ;assigns variable name to value expression by first removing the variable and its old value from the state and adding it back in with the new value
 (define assignment
   (lambda (name expression state)
     (if (layered_declare_check name state) ;if name has been declared
-        (append (priorlist name state) (Add_M_state name (M_value expression state) (Remove_M_state name (M_state expression state '())))) ;adds the name with the new value to the state with name removed
+        (append (priorlist name state) (Add_M_state name (M_value expression state) (Remove_M_state name (M_state expression state '() '())))) ;adds the name with the new value to the state with name removed
         (error "Not Declared"))))
 
 (define priorlist
@@ -100,22 +100,23 @@
 ;if condition is true, perform then-statement on the state
 ;line - entire if-then expression
 (define if-statement
-  (lambda (condition then-statement line state break)
+  (lambda (condition then-statement line state break throw)
     (cond
-      ((M_boolean condition (M_state condition state break)) (M_state then-statement (M_state condition state break) break)) ;if condition is true by M_boolean, perform then-statement with M_state
-      ((null? (cdddr line)) (M_state condition state break))
-      (else (M_state (cadddr line) (M_state condition state break) '())))))
+      ((M_boolean condition (M_state condition state break throw)) (M_state then-statement (M_state condition state break throw) break throw)) ;if condition is true by M_boolean, perform then-statement with M_state
+      ((null? (cdddr line)) (M_state condition state break throw))
+      (else (M_state (cadddr line) (M_state condition state break throw) break throw)))))
 
 ;while condition is true, perform body statement on the state
 (define while-statement
-  (lambda (condition body-statement state)
-    (if (M_boolean condition (M_state condition state '()))
+  (lambda (condition body-statement state throw)
+    (cond
+     ((number? state) state)
+     ((M_boolean condition (M_state condition state '() throw))
         (call/cc
          (lambda (break)
-        (while-statement condition body-statement(M_state body-statement (M_state condition state break) break)))) ;if condtion is true, run while statement again on the changed state
-        (M_state condition state '()))))
-        
-
+        (while-statement condition body-statement (M_state body-statement (M_state condition state break throw) break throw) throw)))) ;if condtion is true, run while statement again on the changed state
+        (M_state condition state '() throw))))   
+     
 ;adds a variable and its value to state, if the value has been declared, but not assigned, its corresponding value is null
 (define Add_M_state
   (lambda (name value state) ;car state = top layer caar state = top layer name's
@@ -129,7 +130,6 @@
       ((is_declared name (caar state)) (cons (remove name (caar state) (cadar state) '() '()) (cdr state)))
       (else (Remove_M_state name (cdr state))))))
 
-
 ;helper function to remove a variable from state list, if variable isn't found then the original state is returned from a saved list
 (define remove
   (lambda (name declare-list value-list saved-declare saved-value)
@@ -139,16 +139,56 @@
       (else (remove name (next-value declare-list) (next-value value-list) (cons (curr-value declare-list) saved-declare) (cons (curr-value value-list) saved-value))))))
 
 (define block
-  (lambda (line state break)
+  (lambda (line state break throw)
     (cond
       ((null? line) (remove_top state))
-      (else (block (cdr line) (M_state (car line) state break) break)))))
+      ((number? state) state)
+      (else (block (cdr line) (M_state (car line) state break throw) break throw)))))
       
 (define add_top
   (lambda (state)
     (cons '(() ()) state)))
 
-(define remove_top cdr)
+(define remove_top
+  (lambda (state)
+    (if (not (list? state)) state (cdr state))))
+
+(define try
+  (lambda (line state break)
+    (cond
+      ((not (number? (try_func (try-line line) state break))) (try-without-catch line state break))
+      ((and (and (not (null? (catch-line line))) (not (null? (finally-line line))))) (finally (finally-line line) (catch (try_func (try-line line) state break) (catch-line line) (add_top state) break) break))
+      ((and (not (null? (catch-line line))) (null? (finally-line line))) (catch (try_func (try-line line) state break) (catch-line line) (add_top state) break))
+      ((and (null? (catch-line line)) (not (null? (finally-line line)))) (finally (finally-line line) (try_func (try-line line) state break) break))
+      ((and (null? (catch-line line)) (null? (finally-line line))) (try_func (try-line line) state break))
+      (else state))))
+
+(define try-without-catch
+  (lambda (line state break)
+    (cond
+      ((not (null? (finally-line line))) (finally (finally-line line) (try_func (try-line line) state break) break))
+      (else (try_func (try-line line) state break)))))
+
+(define try_func
+  (lambda (line state break)
+    (call/cc
+     (lambda (throw)
+       (block line (add_top state) break throw)))))
+
+(define catch
+  (lambda (throw_value line state break)
+    (block (catch-body line) (Add_M_state (input_param line) throw_value state) break '())))
+
+(define finally
+  (lambda (line state break)
+    (block (finally-body line) (add_top state) break '())))
+
+(define catch-line cadr)
+(define finally-body cadr)
+(define catch-body caddr)
+(define finally-line caddr)
+(define input_param caadr)
+(define try-line car)
 
 ;curr-value gets the current value in a list
 (define curr-value car)
@@ -170,7 +210,10 @@
       ((eq? (line-type expression) 'if) (if-statement (get-condition expression) (get-expression expression) expression state break))
       ((eq? (line-type expression) 'while) (while-statement (get-condition expression) (get-expression expression) state))
       ((and (eq? (line-type expression) 'break) (eq? break '())) (error "break not inside loop"))
+      ((and (eq? (line-type expression) 'throw) (eq? throw '())) (error "throw not inside try"))
       ((eq? (line-type expression) 'break) (break (remove_top state)))
+      ((eq? (line-type expression) 'try) (try (cdr expression) state break))
+      ((eq? (line-type expression) 'throw) (throw (M_value (cadr expression) state)))
       (else state))))
 
 (define get-firstline cadr)
