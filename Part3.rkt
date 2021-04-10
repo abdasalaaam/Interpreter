@@ -228,7 +228,7 @@
     (cond
       ((null? expression) state)
       ((not (list? expression)) state)
-      ((list? (line-type expression)) (M_state (cdr expression) (M_state (car expression) state break throw) break throw continue))
+      ((list? (line-type expression)) (M_state (cdr expression) (M_state (car expression) state break throw continue return) break throw continue return))
       ((eq? (line-type expression) 'begin) (block (cdr expression) (add_top state) break throw continue return))
       ((eq? (line-type expression) 'return) (return (M_value (return-expression expression) state)))
       ((eq? (line-type expression) 'var) (declaration (get-name expression) expression state))
