@@ -1,7 +1,6 @@
-
 ;GROUP 16: Abdasalaam Salem, Jamie Booker, Justin Galvez
 #lang racket
-(require "simpleParser.rkt")
+(require "functionParser.rkt")
 
 ;takes a filename that contains the code that is to be sent to the parser
 (define interpret
@@ -222,6 +221,8 @@
 ;next-value gets the next values in a list
 (define next-value cdr)
 
+(define main-check cadr)
+
 ;reterns the state of an expression by calling on its respective function, otherwise the current state will be returned
 (define M_state
   (lambda (expression state break throw continue return)
@@ -229,6 +230,7 @@
       ((null? expression) state)
       ((not (list? expression)) state)
       ((list? (line-type expression)) (M_state (cdr expression) (M_state (car expression) state break throw continue return) break throw continue return))
+      ((and (eq? (line-type expression) 'function) (eq? (main-check expression) 'main)) (block (cdddr expression) state break throw continue return))
       ((eq? (line-type expression) 'begin) (block (cdr expression) (add_top state) break throw continue return))
       ((eq? (line-type expression) 'return) (return (M_value (return-expression expression) state)))
       ((eq? (line-type expression) 'var) (declaration (get-name expression) expression state))
