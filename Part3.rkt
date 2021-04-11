@@ -134,16 +134,14 @@
 
 (define callfunc
   (lambda (name param state break throw continue return)
-    (call/cc
-     (lambda (return)
-    (block (getbody name state) (addActParams (getFormalParams name state) param (add_top state)) break throw continue return)))))
+    (block (getbody name state) (addActParams (getFormalParams name state) param state (add_top (createfunc name (getFormalParams name state) (getbody name state) (getClosureState name state)))) break throw continue return)))
 
 (define addActParams
-  (lambda (formparams actparams state)
+  (lambda (formparams actparams OGstate state)
     (cond
       ((null? formparams) state)
       ((null? actparams) state)
-      ((Add_M_state (car formparams) (M_value (car actparams) state '() '() '() '())  (addActParams (cdr formparams) (cdr actparams) state))))))
+      ((Add_M_state (car formparams) (M_value (car actparams) OGstate '() '() '() '())  (addActParams (cdr formparams) (cdr actparams) OGstate state))))))
 
 (define getFormalParams
   (lambda (name state)
@@ -260,7 +258,7 @@
       ((not (list? expression)) state)
       ((list? (line-type expression)) (M_state (cdr expression) (M_state (car expression) state break throw continue return) break throw continue return))
       ((eq? (line-type expression) 'begin) (block (cdr expression) (add_top state) break throw continue return))
-      ((and (eq? (line-type expression) 'function) (eq? (main-check expression) 'main)) (block (cdddr expression) state break throw continue return))
+      ((and (eq? (line-type expression) 'function) (eq? (main-check expression) 'main)) (block (cdddr expression) (add_top state) break throw continue return))
       ((eq? (line-type expression) 'return) (return (M_value (return-expression expression) state break throw continue return)))
       ((eq? (line-type expression) 'var) (declaration (get-name expression) expression state))
       ((eq? (line-type expression) '=) (assignment (get-name expression) (get-expression expression) state))
@@ -269,12 +267,20 @@
       ((and (eq? (line-type expression) 'break) (eq? break '())) (error "break not inside loop"))
       ((and (eq? (line-type expression) 'throw) (eq? throw '())) (error "throw not inside try"))
       ((eq? (line-type expression) 'break) (break (remove_top state)))
-      ((eq? (line-type expression) 'try) (try (cdr expression) state break continue return))
+      ((eq? (line-type expression) 'try) (try (cdr expression) state break continue))
       ((eq? (line-type expression) 'throw) (throw (M_value (cadr expression) state break throw continue return)))
       ((eq? (line-type expression) 'continue) (continue (remove_top state)))
       ((eq? (line-type expression) 'function) (createfunc (cadr expression) (caddr expression) (cadddr expression) state))
-      ((eq? (line-type expression) 'funcall) (callfunc (cadr expression) (cddr expression) state break throw continue return)) ;paused here - working on creating a parameter function
+      ((eq? (line-type expression) 'funcall) (M_stateCall expression state break throw continue return)) ;paused here - working on creating a parameter function
       (else state))))
+
+(define M_stateCall
+  (lambda (expression state break throw continue return)
+    (cond
+      ((not (list? (call/cc
+                     (lambda (return) (callfunc (cadr expression) (cddr expression) state break throw continue return))))) state)
+      (else (call/cc
+              (lambda (return) (callfunc (cadr expression) (cddr expression) state break throw continue return)))))))
 
 ;gets the condition in a if or while statement
 (define get-condition cadr)
@@ -329,12 +335,13 @@
       ((eq? expression 'false) #f)
       ((not (pair? expression)) (get_from_layers expression state))
       ((eq? (operator expression) '+) (+ (M_value (leftoperand expression) state break throw continue return) (M_value (rightoperand expression) state break throw continue return)))
-      ((eq? (operator expression) '/) (quotient (M_value (leftoperand expression) state) (M_value (rightoperand expression) state break throw continue return)))
-      ((eq? (operator expression) '%) (remainder (M_value (leftoperand expression) state) (M_value (rightoperand expression) state break throw continue return)))
+      ((eq? (operator expression) '/) (quotient (M_value (leftoperand expression) state break throw continue return) (M_value (rightoperand expression) state break throw continue return)))
+      ((eq? (operator expression) '%) (remainder (M_value (leftoperand expression) state break throw continue return) (M_value (rightoperand expression) state break throw continue return)))
       ((and (eq? (operator expression) '-) (null? (cddr expression))) (- (M_value (leftoperand expression) state break throw continue return)))
       ((eq? (operator expression) '-) (- (M_value (leftoperand expression) state break throw continue return) (M_value (rightoperand expression) state break throw continue return)))
       ((eq? (operator expression) '*) (* (M_value (leftoperand expression) state break throw continue return) (M_value (rightoperand expression) state break throw continue return)))
       ((eq? (operator expression) 'var) (M_value (leftoperand expression) (M_state expression state '()) break throw continue return))
       ((eq? (operator expression) '=) (M_value (leftoperand expression) (M_state expression state '()) break throw continue return))
-      ((eq? (operator expression) 'funcall) (callfunc (cadr expression) (cddr expression) state break throw continue return))
-      (else (M_boolean expression state break throw continue))))) ;if the value of expression is either a boolean test (like >=) or if the expression is invalid
+      ((eq? (operator expression) 'funcall) (call/cc
+                                             (lambda (return) (callfunc (cadr expression) (cddr expression) state break throw continue return))))
+      (else (M_boolean expression state break throw continue return))))) ;if the value of expression is either a boolean test (like >=) or if the expression is invalid
