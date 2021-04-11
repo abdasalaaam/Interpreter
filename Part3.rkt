@@ -136,14 +136,14 @@
   (lambda (name param state break throw continue return)
     (call/cc
      (lambda (return)
-    (block (getbody name state) (addActParams (getFormalParams name state) param (add_top state)) break throw continue return)))))
+    (block (getbody name state) (addActParams (getFormalParams name state) param state (add_top (createfunc name (getFormalParams name state) (getbody name state) (getClosureState name state)))) break throw continue return)))))
 
 (define addActParams
-  (lambda (formparams actparams state)
+  (lambda (formparams actparams OGstate state)
     (cond
       ((null? formparams) state)
       ((null? actparams) state)
-      ((Add_M_state (car formparams) (M_value (car actparams) state '() '() '() '())  (addActParams (cdr formparams) (cdr actparams) state))))))
+      ((Add_M_state (car formparams) (M_value (car actparams) OGstate '() '() '() '())  (addActParams (cdr formparams) (cdr actparams) OGstate state))))))
 
 (define getFormalParams
   (lambda (name state)
@@ -260,7 +260,7 @@
       ((not (list? expression)) state)
       ((list? (line-type expression)) (M_state (cdr expression) (M_state (car expression) state break throw continue return) break throw continue return))
       ((eq? (line-type expression) 'begin) (block (cdr expression) (add_top state) break throw continue return))
-      ((and (eq? (line-type expression) 'function) (eq? (main-check expression) 'main)) (block (cdddr expression) state break throw continue return))
+      ((and (eq? (line-type expression) 'function) (eq? (main-check expression) 'main)) (block (cdddr expression) (add_top state) break throw continue return))
       ((eq? (line-type expression) 'return) (return (M_value (return-expression expression) state break throw continue return)))
       ((eq? (line-type expression) 'var) (declaration (get-name expression) expression state))
       ((eq? (line-type expression) '=) (assignment (get-name expression) (get-expression expression) state))
@@ -337,4 +337,4 @@
       ((eq? (operator expression) 'var) (M_value (leftoperand expression) (M_state expression state '()) break throw continue return))
       ((eq? (operator expression) '=) (M_value (leftoperand expression) (M_state expression state '()) break throw continue return))
       ((eq? (operator expression) 'funcall) (callfunc (cadr expression) (cddr expression) state break throw continue return))
-      (else (M_boolean expression state break throw continue))))) ;if the value of expression is either a boolean test (like >=) or if the expression is invalid
+      (else (M_boolean expression state break throw continue return))))) ;if the value of expression is either a boolean test (like >=) or if the expression is invalid
