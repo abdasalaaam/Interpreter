@@ -305,10 +305,10 @@
 (define M_boolean
   (lambda (expression state break throw continue return)
     (cond
-      ((not (list? expression)) (M_value expression state break throw continue))
-      ((eq? (operator expression) '&&) (and (M_boolean (leftoperand expression) state break throw continue return) (M_boolean (rightoperand expression) state break throw continue return)))
-      ((eq? (operator expression) '||) (or (M_boolean (leftoperand expression) state break throw continue return) (M_boolean (rightoperand expression) state break throw continue return)))
-      ((eq? (operator expression) '!) (not (M_boolean (leftoperand expression) state break throw continue return)))
+      ((not (list? expression)) (M_value expression state break throw continue return))
+      ((eq? (operator expression) '&&) (and (M_value (leftoperand expression) state break throw continue return) (M_value (rightoperand expression) state break throw continue return)))
+      ((eq? (operator expression) '||) (or (M_value (leftoperand expression) state break throw continue return) (M_value (rightoperand expression) state break throw continue return)))
+      ((eq? (operator expression) '!) (not (M_value (leftoperand expression) state break throw continue return)))
       ((eq? (operator expression) '==) (= (M_value (leftoperand expression) state break throw continue return) (M_value (rightoperand expression) state break throw continue return)))
       ((eq? (operator expression) '!=) (not (= (M_value (leftoperand expression) state break throw continue return) (M_value (rightoperand expression) state break throw continue return))))
       ((eq? (operator expression) '<) (< (M_value (leftoperand expression) state break throw continue return) (M_value (rightoperand expression) state break throw continue return)))
