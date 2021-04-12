@@ -39,11 +39,18 @@
         (Add_M_state name (M_value (caddr line) state '() '() '() '()) (M_state (caddr line) state '() '() '() '()))))) ;if name is declared with a value
 
 ;assigns variable name to value expression by first removing the variable and its old value from the state and adding it back in with the new value
-(define assignment
+(define assignmentOLD
   (lambda (name expression state)
     (if (layered_declare_check name state) ;if name has been declared
         (append (priorlist name state) (Add_M_state name (M_value expression state '() '() '() '()) (Remove_M_state name (M_state expression state '() '() '() '())))) ;adds the name with the new value to the state with name removed
         (error "Not Declared"))))
+
+(define assignment
+  (lambda (name expression state)
+    (if (layered_declare_check name state)
+        (begin (set-box! (get_from_layers name state) (M_value expression state '() '() '() '())) state)
+        (error "Not Declared"))))
+
 
 ;returns list of layers prior to the first occurence of the layer containing name. Used for assignment helper function
 (define priorlist
@@ -95,8 +102,8 @@
   (lambda (name declare-list value-list)
     (cond
       ((null? declare-list) 'notdeclared)
-      ((and (eq? name (car declare-list)) (eq? (car value-list) 'null)) 'notassigned) ;if the binding for variable name is null it is not assigned
-      ((eq? name (car declare-list)) (car value-list))                                    ;returns value of name if it has been found
+      ((and (eq? name (car declare-list)) (eq? (unbox (car value-list)) 'null)) 'notassigned) ;if the binding for variable name is null it is not assigned
+      ((eq? name (car declare-list)) (car value-list))                             ;returns value of name if it has been found
       (else (get_from_state name (cdr declare-list) (cdr value-list))))))
 
 ;returns the value of expression using the state and M_value function
@@ -126,7 +133,7 @@
 ;adds a variable and its value to state, if the value has been declared, but not assigned, its corresponding value is null
 (define Add_M_state
   (lambda (name value state) ;car state = top layer caar state = top layer name's
-    (cons (list (cons name (caar state)) (cons value (cadar state))) (cdr state))))  ;adds the variable by consing the new first layer with the cdr of state
+    (cons (list (cons name (caar state)) (cons (box value) (cadar state))) (cdr state))))  ;adds the variable by consing the new first layer with the cdr of state
 
 (define createfunc
   (lambda (name params body state)
@@ -145,15 +152,15 @@
 
 (define getFormalParams
   (lambda (name state)
-    (car (get_from_layers name state))))
+    (car (unbox (get_from_layers name state)))))
 
 (define getbody
   (lambda (name state)
-    (cadr (get_from_layers name state))))
+    (cadr (unbox (get_from_layers name state)))))
 
 (define getClosureState
   (lambda (name state)
-    (caddr (get_from_layers name state))))
+    (caddr (unbox (get_from_layers name state)))))
 
 ;removes a variable and its corresponding value from the state by calling the remove function
 (define Remove_M_state
@@ -267,7 +274,7 @@
       ((and (eq? (line-type expression) 'break) (eq? break '())) (error "break not inside loop"))
       ((and (eq? (line-type expression) 'throw) (eq? throw '())) (error "throw not inside try"))
       ((eq? (line-type expression) 'break) (break (remove_top state)))
-      ((eq? (line-type expression) 'try) (try (cdr expression) state break continue))
+      ((eq? (line-type expression) 'try) (try (cdr expression) state break continue return))
       ((eq? (line-type expression) 'throw) (throw (M_value (cadr expression) state break throw continue return)))
       ((eq? (line-type expression) 'continue) (continue (remove_top state)))
       ((eq? (line-type expression) 'function) (createfunc (cadr expression) (caddr expression) (cadddr expression) state))
@@ -305,7 +312,7 @@
 (define M_boolean
   (lambda (expression state break throw continue return)
     (cond
-      ((not (list? expression)) (M_value expression state break throw continue return))
+      ((not (list? expression)) (M_value expression state break throw continue))
       ((eq? (operator expression) '&&) (and (M_value (leftoperand expression) state break throw continue return) (M_value (rightoperand expression) state break throw continue return)))
       ((eq? (operator expression) '||) (or (M_value (leftoperand expression) state break throw continue return) (M_value (rightoperand expression) state break throw continue return)))
       ((eq? (operator expression) '!) (not (M_value (leftoperand expression) state break throw continue return)))
@@ -333,7 +340,7 @@
       ((number? expression) expression)
       ((eq? expression 'true) #t)
       ((eq? expression 'false) #f)
-      ((not (pair? expression)) (get_from_layers expression state))
+      ((not (pair? expression)) (unbox (get_from_layers expression state)))
       ((eq? (operator expression) '+) (+ (M_value (leftoperand expression) state break throw continue return) (M_value (rightoperand expression) state break throw continue return)))
       ((eq? (operator expression) '/) (quotient (M_value (leftoperand expression) state break throw continue return) (M_value (rightoperand expression) state break throw continue return)))
       ((eq? (operator expression) '%) (remainder (M_value (leftoperand expression) state break throw continue return) (M_value (rightoperand expression) state break throw continue return)))
