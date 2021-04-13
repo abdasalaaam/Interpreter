@@ -152,8 +152,6 @@
 (define addActParams
   (lambda (formparams actparams OGstate state)
     (cond
-      ((and (null? formparams) (not (null? actparams))) error "Using different number of parameters")
-      ((and (null? actparams) (not (null? formparams))) error "Using different number of parameters")
       ((null? formparams) state)
       ((null? actparams) state)
       ((Add_M_state (car formparams) (M_value (car actparams) OGstate '() '() '() '())  (addActParams (cdr formparams) (cdr actparams) OGstate state))))))
