@@ -1,5 +1,5 @@
 #lang racket
-;GROUP 16: Abdasalaam Salem, Jamie Booker, Justin Galvez
+;GROUP 7: Abdasalaam Salem, Jamie Booker, Justin Galvez
 (require "functionParser.rkt")
 
 ;takes a filename that contains the code that is to be sent to the parser
@@ -80,22 +80,28 @@
       ((null? declare-list) error "Not Declared")
       ((eq? (car declare-list) name) (not (eq? (car value-list) 'null))) ;if the name is found in the declare-list and the value is not null, return true
       (else (is_assigned name (cdr declare-list) (cdr value-list))))))
-      
+
+;gets the declarations list from a state
+(define declarations-list caar)
+
+;gets a values list from a state
+(define values-list cadar)
+
 ;checks all layers, starting from top, for a name and returns its associated value or returns error not assigned
 (define get_from_layers
   (lambda (name state)
     (cond
       ((null? state) (error "Not Declared"))
-      ((eq? (get_from_state name (caar state) (cadar state)) 'notdeclared) (get_from_layers name (cdr state)))
-      ((eq? (unbox (get_from_state name (caar state) (cadar state))) 'null) (error "Not Assigned"))
-      (else (get_from_state name (caar state) (cadar state))))))
+      ((eq? (get_from_state name (declarations-list state) (values-list state)) 'notdeclared) (get_from_layers name (cdr state)))
+      ((eq? (unbox (get_from_state name (declarations-list state) (values-list state))) 'null) (error "Not Assigned"))
+      (else (get_from_state name (declarations-list state) (values-list state))))))
 
 (define get_box_from_layers
   (lambda (name state)
     (cond
       ((null? state) (error "Not Declared"))
-      ((eq? (get_from_state name (caar state) (cadar state)) 'notdeclared) (get_box_from_layers name (cdr state)))
-      (else (get_from_state name (caar state) (cadar state))))))
+      ((eq? (get_from_state name (declarations-list state) (values-list state)) 'notdeclared) (get_box_from_layers name (cdr state)))
+      (else (get_from_state name (declarations-list state) (values-list state))))))
  
 ;reads through the declared/value list bindings and returns the value of the variable if found in declare-list and if it is assigned
 (define get_from_state
@@ -104,11 +110,6 @@
       ((null? declare-list) 'notdeclared)
       ((eq? name (car declare-list)) (car value-list))                             ;returns value of name if it has been found
       (else (get_from_state name (cdr declare-list) (cdr value-list))))))
-
-;returns the value of expression using the state and M_value function
-;(define return
- ; (lambda (expression state)
-  ;  (M_value expression (M_state expression state '() '() '() '())  '() '() '())))
 
 ;if condition is true, perform then-statement on the state
 ;line - entire if-then expression
@@ -283,10 +284,19 @@
       ((eq? (line-type expression) 'try) (try (cdr expression) state break throw continue return))
       ((eq? (line-type expression) 'throw) (throw (M_value (cadr expression) state break throw continue return)))
       ((eq? (line-type expression) 'continue) (continue (remove_top state)))
-      ((eq? (line-type expression) 'function) (createfunc (cadr expression) (caddr expression) (cadddr expression) state))
+      ((eq? (line-type expression) 'function) (createfunc (get-params expression) (get-body expression) (get-environment expression) state))
       ((eq? (line-type expression) 'funcall) (begin (call/cc
-                     (lambda (return) (callfunc (cadr expression) (cddr expression) state break throw continue return))) state)) ;paused here - working on creating a parameter function
+                     (lambda (return) (callfunc (get-params expression) (get-body expression) state break throw continue return))) state)) ;paused here - working on creating a parameter function
       (else state))))
+
+;gets the parameters from a closure
+(define get-params cadr)
+
+;gets the body from a closure
+(define get-body caddr)
+
+;gets the environment from a closure
+(define get-environment cadddr)
 
 ;gets the condition in a if or while statement
 (define get-condition cadr)
