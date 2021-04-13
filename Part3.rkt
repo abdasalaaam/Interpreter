@@ -1,5 +1,5 @@
 #lang racket
-;GROUP 7: Abdasalaam Salem, Jamie Booker, Justin Galvez
+;GROUP 16: Abdasalaam Salem, Jamie Booker, Justin Galvez
 (require "functionParser.rkt")
 
 ;takes a filename that contains the code that is to be sent to the parser
