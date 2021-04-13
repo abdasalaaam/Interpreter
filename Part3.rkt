@@ -62,23 +62,29 @@
       ((null? declare-list) #f)
       ((eq? name (car declare-list)) #t) ;if it finds the variable name in the declared list of variables, it is declared
       (else (is_declared name (cdr declare-list))))))
+
+;gets the declarations list from a state
+(define declarations-list caar)
+
+;gets a values list from a state
+(define values-list cadar)
       
 ;checks all layers, starting from top, for a name and returns its associated value or returns error if not assigned. used for acquiring the value of a box
 (define get_from_layers
   (lambda (name state)
     (cond
       ((null? state) (error "Not Declared"))
-      ((eq? (get_from_state name (caar state) (cadar state)) 'notdeclared) (get_from_layers name (cdr state)))
-      ((eq? (unbox (get_from_state name (caar state) (cadar state))) 'null) (error "Not Assigned"))
-      (else (get_from_state name (caar state) (cadar state))))))
+      ((eq? (get_from_state name (declarations-list state) (values-list state)) 'notdeclared) (get_from_layers name (cdr state)))
+      ((eq? (unbox (get_from_state name (declarations-list state) (values-list state))) 'null) (error "Not Assigned"))
+      (else (get_from_state name (declarations-list state) (values-list state))))))
 
 ;checks all layers, starting from the top, and finds the box that is associated with name. used for acquiring the box.
 (define get_box_from_layers
   (lambda (name state)
     (cond
       ((null? state) (error "Not Declared"))
-      ((eq? (get_from_state name (caar state) (cadar state)) 'notdeclared) (get_box_from_layers name (cdr state)))
-      (else (get_from_state name (caar state) (cadar state))))))
+      ((eq? (get_from_state name (declarations-list state) (values-list state)) 'notdeclared) (get_box_from_layers name (cdr state)))
+      (else (get_from_state name (declarations-list state) (values-list state))))))
  
 ;reads through the declared/value list bindings and returns the value of the variable if found in declare-list and if it is assigned
 (define get_from_state
@@ -248,6 +254,15 @@
 
 (define main-check cadr)
 
+;gets the parameters from a closure
+(define get-params cadr)
+
+;gets the body from a closure
+(define get-body caddr)
+
+;gets the environment from a closure
+(define get-environment cadddr)
+
 ;reterns the state of an expression by calling on its respective function, otherwise the current state will be returned
 (define M_state
   (lambda (expression state break throw continue return)
@@ -268,9 +283,9 @@
       ((eq? (line-type expression) 'try) (try (cdr expression) state break throw continue return))
       ((eq? (line-type expression) 'throw) (throw (M_value (cadr expression) state break throw continue return)))
       ((eq? (line-type expression) 'continue) (continue (remove_top state)))
-      ((eq? (line-type expression) 'function) (createfunc (cadr expression) (caddr expression) (cadddr expression) state))
+      ((eq? (line-type expression) 'function) (createfunc (get-params expression) (get-body expression) (get-environment expression) state))
       ((eq? (line-type expression) 'funcall) (begin (call/cc
-                     (lambda (return) (callfunc (cadr expression) (cddr expression) state break throw continue return))) state)) ;paused here - working on creating a parameter function
+                     (lambda (return) (callfunc (get-params expression) (cddr expression) state break throw continue return))) state)) ;paused here - working on creating a parameter function
       (else state))))
 
 ;gets the condition in a if or while statement
