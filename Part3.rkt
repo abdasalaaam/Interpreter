@@ -46,9 +46,9 @@
         (error "Not Declared"))))
 
 (define assignment
-  (lambda (name expression state)
+  (lambda (name expression state break throw continue return)
     (if (layered_declare_check name state)
-        (begin (set-box! (get_box_from_layers name state) (M_value expression state '() '() '() '())) state)
+        (begin (set-box! (get_box_from_layers name state) (M_value expression state break throw continue return)) state)
         (error "Not Declared"))))
 
 
@@ -160,7 +160,7 @@
 (define sizeOfParams
   (lambda (lis)
     (cond
-      ((null? (cdr lis)) 1)
+      ((null? lis) 0)
       (else (+ 1 (sizeOfParams (cdr lis)))))))
 
 (define getFormalParams
@@ -211,38 +211,38 @@
 
 ;contains the conditions that a try block may encounter and calls the catch/finally/try-without-catch functions accordingly
 (define try
-  (lambda (line state break continue)
+  (lambda (line state break throw continue return)
     (cond
-      ((not (number? (try_func (try-line line) state break continue))) (try-without-catch line state break continue))
-      ((and (and (not (null? (catch-line line))) (not (null? (finally-line line))))) (finally (finally-line line) (catch (try_func (try-line line) state break continue) (catch-line line) (add_top state) break continue) break continue))
-      ((and (not (null? (catch-line line))) (null? (finally-line line))) (catch (try_func (try-line line) state break continue) (catch-line line) (add_top state) break continue))
-      ((and (null? (catch-line line)) (not (null? (finally-line line)))) (finally (finally-line line) (try_func (try-line line) state break continue) break continue))
-      ((and (null? (catch-line line)) (null? (finally-line line))) (try_func (try-line line) state break continue))
+      ((not (number? (try_func (try-line line) state break throw continue return))) (try-without-catch line state break throw continue return))
+      ((and (and (not (null? (catch-line line))) (not (null? (finally-line line))))) (finally (finally-line line) (catch (try_func (try-line line) state break throw continue return) (catch-line line) (add_top state) break throw continue return) break throw continue return))
+      ((and (not (null? (catch-line line))) (null? (finally-line line))) (catch (try_func (try-line line) state break throw continue return) (catch-line line) (add_top state) break throw continue return))
+      ((and (null? (catch-line line)) (not (null? (finally-line line)))) (finally (finally-line line) (try_func (try-line line) state break throw continue return) break throw continue return))
+      ((and (null? (catch-line line)) (null? (finally-line line))) (try_func (try-line line) state break throw continue return))
       (else state))))
 
 ;A try without a catch will either only run the try block or run the try block and continue on to the final
 (define try-without-catch
-  (lambda (line state break continue)
+  (lambda (line state break throw continue return)
     (cond
-      ((not (null? (finally-line line))) (finally (finally-line line) (try_func (try-line line) state break continue) break continue))
-      (else (try_func (try-line line) state break continue)))))
+      ((not (null? (finally-line line))) (finally (finally-line line) (try_func (try-line line) state break throw continue return) break throw continue return))
+      (else (try_func (try-line line) state break throw continue return)))))
 
 ;assess the M_state of the try block function
 (define try_func
-  (lambda (line state break continue)
+  (lambda (line state break throw continue return)
     (call/cc
      (lambda (throw)
-       (block line (add_top state) break throw continue '())))))
+       (block line (add_top state) break throw continue return)))))
 
 ;Evaluates the body of catch blocks by calling the block function
 (define catch
-  (lambda (throw_value line state break continue)
-    (block (catch-body line) (Add_M_state (input_param line) throw_value state) break '() continue '())))
+  (lambda (throw_value line state break throw continue return)
+    (block (catch-body line) (Add_M_state (input_param line) throw_value state) break throw continue return)))
 
 ;Evaluates the finally block by calling the block function
 (define finally
-  (lambda (line state break continue)
-    (block (finally-body line) (add_top state) break '() continue '())))
+  (lambda (line state break throw continue return)
+    (block (finally-body line) (add_top state) break throw continue return)))
 
 ;entire catch line containing "catch"
 (define catch-line cadr)
@@ -281,13 +281,13 @@
       ((and (eq? (line-type expression) 'function) (eq? (main-check expression) 'main)) (block (cdddr expression) (add_top state) break throw continue return))
       ((eq? (line-type expression) 'return) (return (M_value (return-expression expression) state break throw continue return)))
       ((eq? (line-type expression) 'var) (declaration (get-name expression) expression state))
-      ((eq? (line-type expression) '=) (assignment (get-name expression) (get-expression expression) state))
+      ((eq? (line-type expression) '=) (assignment (get-name expression) (get-expression expression) state break throw continue return))
       ((eq? (line-type expression) 'if) (if-statement (get-condition expression) (get-expression expression) expression state break throw continue return))
       ((eq? (line-type expression) 'while) (while-statement (get-condition expression) (get-expression expression) state throw return))
       ((and (eq? (line-type expression) 'break) (eq? break '())) (error "break not inside loop"))
       ((and (eq? (line-type expression) 'throw) (eq? throw '())) (error "throw not inside try"))
       ((eq? (line-type expression) 'break) (break (remove_top state)))
-      ((eq? (line-type expression) 'try) (try (cdr expression) state break continue ))
+      ((eq? (line-type expression) 'try) (try (cdr expression) state break throw continue return))
       ((eq? (line-type expression) 'throw) (throw (M_value (cadr expression) state break throw continue return)))
       ((eq? (line-type expression) 'continue) (continue (remove_top state)))
       ((eq? (line-type expression) 'function) (createfunc (cadr expression) (caddr expression) (cadddr expression) state))
