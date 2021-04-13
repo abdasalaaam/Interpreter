@@ -152,9 +152,16 @@
 (define addActParams
   (lambda (formparams actparams OGstate state)
     (cond
+      ((not (eq? (sizeOfParams formparams) (sizeOfParams actparams))) (error "Incorect number of function inputs"))
       ((null? formparams) state)
       ((null? actparams) state)
       ((Add_M_state (car formparams) (M_value (car actparams) OGstate '() '() '() '())  (addActParams (cdr formparams) (cdr actparams) OGstate state))))))
+
+(define sizeOfParams
+  (lambda (lis)
+    (cond
+      ((null? (cdr lis)) 1)
+      (else (+ 1 (sizeOfParams (cdr lis)))))))
 
 (define getFormalParams
   (lambda (name state)
