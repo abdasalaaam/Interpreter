@@ -48,7 +48,7 @@
 (define assignment
   (lambda (name expression state)
     (if (layered_declare_check name state)
-        (begin (set-box! (get_from_layers name state) (M_value expression state '() '() '() '())) state)
+        (begin (set-box! (get_box_from_layers name state) (M_value expression state '() '() '() '())) state)
         (error "Not Declared"))))
 
 
@@ -94,15 +94,21 @@
     (cond
       ((null? state) (error "Not Declared"))
       ((eq? (get_from_state name (caar state) (cadar state)) 'notdeclared) (get_from_layers name (cdr state)))
-      ((eq? (get_from_state name (caar state) (cadar state)) 'notassigned) (error "Not Assigned"))
+      ((eq? (unbox (get_from_state name (caar state) (cadar state))) 'null) (error "Not Assigned"))
       (else (get_from_state name (caar state) (cadar state))))))
 
+(define get_box_from_layers
+  (lambda (name state)
+    (cond
+      ((null? state) (error "Not Declared"))
+      ((eq? (get_from_state name (caar state) (cadar state)) 'notdeclared) (get_box_from_layers name (cdr state)))
+      (else (get_from_state name (caar state) (cadar state))))))
+ 
 ;reads through the declared/value list bindings and returns the value of the variable if found in declare-list and if it is assigned
 (define get_from_state
   (lambda (name declare-list value-list)
     (cond
       ((null? declare-list) 'notdeclared)
-      ((and (eq? name (car declare-list)) (eq? (unbox (car value-list)) 'null)) 'notassigned) ;if the binding for variable name is null it is not assigned
       ((eq? name (car declare-list)) (car value-list))                             ;returns value of name if it has been found
       (else (get_from_state name (cdr declare-list) (cdr value-list))))))
 
@@ -146,6 +152,8 @@
 (define addActParams
   (lambda (formparams actparams OGstate state)
     (cond
+      ((and (null? formparams) (not (null? actparams))) error "Using different number of parameters")
+      ((and (null? actparams) (not (null? formparams))) error "Using different number of parameters")
       ((null? formparams) state)
       ((null? actparams) state)
       ((Add_M_state (car formparams) (M_value (car actparams) OGstate '() '() '() '())  (addActParams (cdr formparams) (cdr actparams) OGstate state))))))
@@ -274,11 +282,12 @@
       ((and (eq? (line-type expression) 'break) (eq? break '())) (error "break not inside loop"))
       ((and (eq? (line-type expression) 'throw) (eq? throw '())) (error "throw not inside try"))
       ((eq? (line-type expression) 'break) (break (remove_top state)))
-      ((eq? (line-type expression) 'try) (try (cdr expression) state break continue return))
+      ((eq? (line-type expression) 'try) (try (cdr expression) state break continue ))
       ((eq? (line-type expression) 'throw) (throw (M_value (cadr expression) state break throw continue return)))
       ((eq? (line-type expression) 'continue) (continue (remove_top state)))
       ((eq? (line-type expression) 'function) (createfunc (cadr expression) (caddr expression) (cadddr expression) state))
-      ((eq? (line-type expression) 'funcall) (M_stateCall expression state break throw continue return)) ;paused here - working on creating a parameter function
+      ((eq? (line-type expression) 'funcall) (begin (call/cc
+                     (lambda (return) (callfunc (cadr expression) (cddr expression) state break throw continue return))) state)) ;paused here - working on creating a parameter function
       (else state))))
 
 (define M_stateCall
@@ -286,8 +295,7 @@
     (cond
       ((not (list? (call/cc
                      (lambda (return) (callfunc (cadr expression) (cddr expression) state break throw continue return))))) state)
-      (else (call/cc
-              (lambda (return) (callfunc (cadr expression) (cddr expression) state break throw continue return)))))))
+      (else (begin (callfunc (cadr expression) (cddr expression) state break throw continue return) state)))))
 
 ;gets the condition in a if or while statement
 (define get-condition cadr)
