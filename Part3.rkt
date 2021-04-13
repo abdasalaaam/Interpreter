@@ -38,13 +38,6 @@
         (Add_M_state name 'null state)                                                  ;if variable name is declared without a value
         (Add_M_state name (M_value (caddr line) state '() '() '() '()) (M_state (caddr line) state '() '() '() '()))))) ;if name is declared with a value
 
-;assigns variable name to value expression by first removing the variable and its old value from the state and adding it back in with the new value
-(define assignmentOLD
-  (lambda (name expression state)
-    (if (layered_declare_check name state) ;if name has been declared
-        (append (priorlist name state) (Add_M_state name (M_value expression state '() '() '() '()) (Remove_M_state name (M_state expression state '() '() '() '())))) ;adds the name with the new value to the state with name removed
-        (error "Not Declared"))))
-
 (define assignment
   (lambda (name expression state break throw continue return)
     (if (layered_declare_check name state)
@@ -294,13 +287,6 @@
       ((eq? (line-type expression) 'funcall) (begin (call/cc
                      (lambda (return) (callfunc (cadr expression) (cddr expression) state break throw continue return))) state)) ;paused here - working on creating a parameter function
       (else state))))
-
-(define M_stateCall
-  (lambda (expression state break throw continue return)
-    (cond
-      ((not (list? (call/cc
-                     (lambda (return) (callfunc (cadr expression) (cddr expression) state break throw continue return))))) state)
-      (else (begin (callfunc (cadr expression) (cddr expression) state break throw continue return) state)))))
 
 ;gets the condition in a if or while statement
 (define get-condition cadr)
