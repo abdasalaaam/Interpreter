@@ -34,13 +34,17 @@
   (lambda (classname state return)
     (block (getStaticMethod 'main classname state) (add_top state) '() '() '() return)))
 
+(define makeInstanceClosure
+  (lambda (line state)
+    (list (cdr line) (cadr (unbox (get_from_layers (cadr line) state))))))
+
 (define create_class
-  (lambda (name body state)
-    (Add_M_state name (makeClassClosure body) state)))
+  (lambda (name line state)
+    (Add_M_state name (makeClassClosure line) state)))
 
 (define makeClassClosure
   (lambda (body)
-    (list (pullSuper body) (findItems 'var (cadr body) initialstate) (findItems 'function (cadr body) initialstate) (findItems 'static-function (cadr body) initialstate))))
+    (list (pullSuper body) (findItems 'var (cadddr body) initialstate) (findItems 'function (cadddr body) initialstate) (findItems 'static-function (cadddr body) initialstate))))
 
 (define findItems
   (lambda (item body state)
@@ -50,18 +54,18 @@
       (else (findItems item (cdr body) state)))))
 
 (define pullSuper
-  (lambda (body)
+  (lambda (classline)
     (cond
-      ((null? body)   '())
-      ((null? (car body)) '())
-      ((eq? (caar body) 'extends) (cons (cdar body) '()))
-      (else (pullSuper (cdr body))))))
+      ((null? classline)           '())
+      ((null? (car classline))     '())
+      ((and (list? (car classline)) (eq? (caar classline) 'extends))  (cons (cdar classline) '()))
+      (else                        (pullSuper (cdr classline))))))
 
-;gets the main function body from the 
+;gets the main function body from the state
 (define getStaticMethod
   (lambda (name classname state)
     (getbody name (cadddr (unbox (get_from_layers classname state))))))
-
+      
 ;if value of name is a non number/not a boolean, its undeclared
 ;line - the entire declaration expression
 (define declaration
@@ -154,7 +158,9 @@
 (define createfunc
   (lambda (name params body state)
     (Add_M_state name (cons params (cons body (cons state '()))) state)))
-      
+
+;(list of super) (list of variables) (list of methods) (list of static methods)
+
 ;calls a function by calling block on the closure with the function added to that specific closure
 (define callfunc
   (lambda (name param state break throw continue return)
@@ -287,10 +293,10 @@
 (define main-check cadr)
 
 ;gets the parameters from a closure
-(define get-params caddr)
+(define get-params cadr)
 
 ;gets the body from a closure
-(define get-body cadddr)
+(define get-body caddr)
 
 ;gets the environment from a closure
 (define get-environment cadddr)
@@ -303,6 +309,7 @@
       ((not (list? expression)) state)
       ((list? (line-type expression)) (M_state (cdr expression) (M_state (car expression) state break throw continue return) break throw continue return))
       ((eq? (line-type expression) 'begin) (block (cdr expression) (add_top state) break throw continue return))
+      ((and (eq? (line-type expression) 'function) (eq? (main-check expression) 'main)) (block (cdddr expression) (add_top state) break throw continue return))
       ((eq? (line-type expression) 'return) (return (M_value (return-expression expression) state break throw continue return)))
       ((eq? (line-type expression) 'var) (declaration (get-name expression) expression state))
       ((eq? (line-type expression) '=) (assignment (get-name expression) (get-expression expression) state break throw continue return))
@@ -314,17 +321,15 @@
       ((eq? (line-type expression) 'try) (try (cdr expression) state break throw continue return))
       ((eq? (line-type expression) 'throw) (throw (M_value (cadr expression) state break throw continue return)))
       ((eq? (line-type expression) 'continue) (continue (remove_top state)))
-      ((eq? (line-type expression) 'function) (createfunc (get-name expression) (get-params expression) (get-body expression) state))
-      ((eq? (line-type expression) 'static-function) (createfunc (get-name expression) (get-params expression) (get-body expression) state))
+      ((eq? (line-type expression) 'function) (createfunc (get-params expression) (get-body expression) (get-environment expression) state))
+      ((eq? (line-type expression) 'static-function) (createfunc (get-params expression) (get-body expression) (get-environment expression) state))
       ((eq? (line-type expression) 'funcall) (begin (call/cc
-                     (lambda (return) (callfunc (get-params expression) (cddr expression) state break throw continue return))) state))
-      ((eq? (line-type expression) 'class) (create_class (get-name expression) (get-class expression) state))
+                     (lambda (return) (callfunc (get-params expression) (cddr expression) state break throw continue return))) state)) ;paused here - working on creating a parameter function
+      ((eq? (line-type expression) 'class) (create_class (cadr expression) expression state))
       (else state))))
 
 ;gets the condition in a if or while statement
 (define get-condition cadr)
-
-(define get-class cddr)
 
 ;gets the then statement in a if or while statement
 (define get-then-statement caddr)
@@ -374,15 +379,16 @@
       ((number? expression) expression)
       ((eq? expression 'true) #t)
       ((eq? expression 'false) #f)
-      ((not (pair? expression)) (unbox (get_from_layers expression state)))
-      ((eq? (operator expression) '+) (+ (M_value (leftoperand expression) state break throw continue return) (M_value (rightoperand expression) state break throw continue return)))
-      ((eq? (operator expression) '/) (quotient (M_value (leftoperand expression) state break throw continue return) (M_value (rightoperand expression) state break throw continue return)))
-      ((eq? (operator expression) '%) (remainder (M_value (leftoperand expression) state break throw continue return) (M_value (rightoperand expression) state break throw continue return)))
-      ((and (eq? (operator expression) '-) (null? (cddr expression))) (- (M_value (leftoperand expression) state break throw continue return)))
-      ((eq? (operator expression) '-) (- (M_value (leftoperand expression) state break throw continue return) (M_value (rightoperand expression) state break throw continue return)))
-      ((eq? (operator expression) '*) (* (M_value (leftoperand expression) state break throw continue return) (M_value (rightoperand expression) state break throw continue return)))
-      ((eq? (operator expression) 'var) (M_value (leftoperand expression) (M_state expression state '()) break throw continue return))
-      ((eq? (operator expression) '=) (M_value (leftoperand expression) (M_state expression state '()) break throw continue return))
+      ((not (pair? expression))             (unbox (get_from_layers expression state)))
+      ((eq? (operator expression) '+)       (+ (M_value (leftoperand expression) state break throw continue return) (M_value (rightoperand expression) state break throw continue return)))
+      ((eq? (operator expression) '/)       (quotient (M_value (leftoperand expression) state break throw continue return) (M_value (rightoperand expression) state break throw continue return)))
+      ((eq? (operator expression) '%)       (remainder (M_value (leftoperand expression) state break throw continue return) (M_value (rightoperand expression) state break throw continue return)))
+      ((and (eq? (operator expression) '-)  (null? (cddr expression))) (- (M_value (leftoperand expression) state break throw continue return)))
+      ((eq? (operator expression) '-)       (- (M_value (leftoperand expression) state break throw continue return) (M_value (rightoperand expression) state break throw continue return)))
+      ((eq? (operator expression) '*)       (* (M_value (leftoperand expression) state break throw continue return) (M_value (rightoperand expression) state break throw continue return)))
+      ((eq? (operator expression) 'var)     (M_value (leftoperand expression) (M_state expression state '()) break throw continue return))
+      ((eq? (operator expression) '=)       (M_value (leftoperand expression) (M_state expression state '()) break throw continue return))
       ((eq? (operator expression) 'funcall) (call/cc
                                              (lambda (return) (callfunc (cadr expression) (cddr expression) state break throw continue return))))
+      ((eq? (operator expression) 'new)     (makeInstanceClosure expression state))
       (else (M_boolean expression state break throw continue return))))) ;if the value of expression is either a boolean test (like >=) or if the expression is invalid
