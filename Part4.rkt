@@ -81,9 +81,19 @@
 ;assigns a new value to the box that is binded to name
 (define assignment
   (lambda (name expression state break throw continue return current)
-    (if (layered_declare_check name state)
-        (begin (set-box! (get_box_from_layers name state) (M_value expression state break throw continue return current)) state)
-        (error "Not Declared"))))
+    (cond
+      ((pair? name) (begin (set-box!(get_box_from_layers (checkThis name current) state) (update-box (M_value expression state break throw continue return current) (unbox (get_from_layers (checkThis name current) state)) expression)) state))
+      ((layered_declare_check name state)                        (begin (set-box!(get_box_from_layers name state) (M_value expression state break throw continue return current)) state))
+      (else (error "Not Declared")))))
+
+(define checkThis
+  (lambda (name current)
+    (if (eq? (cadr name) 'this) current
+        (cadr name))))
+
+(define update-box
+  (lambda (value closure varname)
+    (list (car closure) (assignment varname value (cadr closure) '() '() '() '() '()))))
 
 ;goes through each layer, starting at the top, to check for variable declarations. Returns a scheme boolean
 (define layered_declare_check
@@ -376,7 +386,7 @@
       ((eq? (line-type expression) 'function) (createfunc (get-params expression) (get-body expression) (get-environment expression) state current))
       ((eq? (line-type expression) 'static-function) (createfunc (get-params expression) (get-body expression) (get-environment expression) state current))
       ((eq? (line-type expression) 'funcall) (begin (call/cc
-                     (lambda (return) (callfunc (cadr expression) (cddr expression) state break throw continue return current))) state)) ;paused here - working on creating a parameter function
+                     (lambda (return) (callfunc (cadr expression) (cddr expression) state break throw continue return (checkCurrent current (cadr expression))))) state)) ;paused here - working on creating a parameter function
       ((eq? (line-type expression) 'class) (create_class (cadr expression) expression state))
       (else state))))
 
@@ -441,7 +451,7 @@
       ((eq? (operator expression) 'var)     (M_value (leftoperand expression) (M_state expression state '() '() '() '() current) break throw continue return current))
       ((eq? (operator expression) '=)       (M_value (leftoperand expression) (M_state expression state '() '() '() '() current) break throw continue return current))
       ((eq? (operator expression) 'funcall) (call/cc
-                                            (lambda (return) (callfunc (cadr expression) (cddr expression) state break throw continue return current))))
+                                            (lambda (return) (callfunc (cadr expression) (cddr expression) state break throw continue return (checkCurrent current (cadr expression))))))
       ((eq? (operator expression) 'new)     (makeInstanceClosure expression state))
       ((eq? (operator expression) 'dot)     (M_value (rightoperand expression) (cadr (getInstanceClosure (leftoperand expression) state current)) break throw continue return current))
       (else (M_boolean expression state break throw continue return current))))) ;if the value of expression is either a boolean test (like >=) or if the expression is invalid
