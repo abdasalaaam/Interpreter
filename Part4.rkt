@@ -30,6 +30,7 @@
         (lambda (return)
        (evaluate-line (car tree) (cdr tree) (M_state line state '() '() '() return '()) classname)))))))
 
+;runs the main function by finding the static method main within the class in question
 (define runmain
   (lambda (classname state return)
     (block (cadr (getStaticMethod 'main classname state)) (add_top state) '() '() '() return classname)))
@@ -46,6 +47,8 @@
   (lambda (body)
     (list (pullSuper body) (findItems 'var (cadddr body) initialstate) (findItems 'function (cadddr body) initialstate) (findItems 'static-function (cadddr body) initialstate))))
 
+;used in defining the class closure. searches through the class body and locates all M_state instantiations - variables or nonstatic/static methods
+;then adds those instantiations into an empty state for creation of many states within the class closure.
 (define findItems
   (lambda (item body state)
     (cond
@@ -61,11 +64,12 @@
       ((and (list? (car classline)) (eq? (caar classline) 'extends))  (cons (cdar classline) '()))
       (else                        (pullSuper (cdr classline))))))
 
-;gets the main function body from the state
+;returns a static method's closure from within the class closure. used in calling the main function.
 (define getStaticMethod
   (lambda (name classname state)
     (unbox (get_from_layers name (cadddr (unbox (get_from_layers classname state)))))))
 
+;returns a nonstatic method's closure from within the class closure
 (define getNonStaticMethod
   (lambda (name classname state)
     (unbox (get_from_layers name (caddr (unbox (get_from_layers classname state)))))))
@@ -86,11 +90,14 @@
       ((layered_declare_check name state)                        (begin (set-box!(get_box_from_layers name state) (M_value expression state break throw continue return current)) state))
       (else (error "Not Declared")))))
 
+;helper used to check if the class name in a dot operator is this or a regular name
 (define checkThis
   (lambda (name current)
     (if (eq? (cadr name) 'this) current
         (cadr name))))
 
+;updates the box in an instance closure for assigning variables that belong to instances. gives a problem since we are using boxes
+;the box that is represented by the variable in the instance closure is the same box for all instances that use the same name variable
 (define update-box
   (lambda (value closure varname)
     (list (car closure) (assignment varname value (cadr closure) '() '() '() '() '()))))
@@ -173,8 +180,6 @@
   (lambda (name params body state class)
     (Add_M_state name (cons params (cons body (cons state (cons class '())))) state)))
 
-;(list of super) (list of variables) (list of methods) (list of static methods)
-
 ;calls a function by calling block on the closure with the function added to that specific closure
 (define callfunc
   (lambda (name param state break throw continue return current)
@@ -186,7 +191,8 @@
                                                                                   (findClosureState name state (checkCurrent current name))
                                                                                   (findMethodClass name state (checkCurrent current name))))))
            break throw continue return current)))
-
+           
+;helper method used to differentiate between the class that a function is defined in and the class that resembles this on the left side of a dot operator
 (define checkCurrent
   (lambda (outsideClass functionToCall)
     (if (not (pair? functionToCall)) outsideClass
@@ -197,6 +203,7 @@
     (if (not (pair? name)) name
         (caddr name))))
 
+;finds the parameters for a method that was defined in a class. searches through class closure and finds method closure to do so
 (define findMethodParams
   (lambda (expression state current)
     (cond
@@ -204,6 +211,7 @@
       ((eq? (car expression) 'dot) (car (getNonStaticMethod (caddr expression) (caar (getInstanceClosure (cadr expression) state current)) state)))
       (else expression))))
 
+;finds the body for a method that was defined in a class
 (define findClassMethodBody
   (lambda (expression state current)
     (cond
@@ -211,6 +219,7 @@
       ((eq? (car expression) 'dot) (cadr (getNonStaticMethod (caddr expression) (caar (getInstanceClosure (cadr expression) state current)) state)))
       (else expression))))
 
+;finds the state that was at function definition for a function that was defined in a class
 (define findClosureState
   (lambda (expression state current)
     (cond
@@ -218,6 +227,7 @@
       ((eq? (car expression) 'dot) (caddr (getNonStaticMethod (caddr expression) (caar (getInstanceClosure (cadr expression) state current)) state)))
       (else expression))))
 
+;finds the class that the specific method is defined in
 (define findMethodClass
   (lambda (expression state current)
     (cond
@@ -256,7 +266,7 @@
   (lambda (name state)
     (caddr (unbox (get_from_layers name state)))))
 
-
+;gets the class that the method is defined in
 (define getMethodClass
   (lambda (name state)
     (cadddr (unbox (get_from_layers name state)))))
@@ -441,6 +451,7 @@
       ((eq? (operator expression) 'dot)     (M_value (rightoperand expression) (cadr (getInstanceClosure (leftoperand expression) state current)) break throw continue return current))
       (else (M_boolean expression state break throw continue return current))))) ;if the value of expression is either a boolean test (like >=) or if the expression is invalid
   
+;retunrs the instance closure for a certain instance
 (define getInstanceClosure
   (lambda (class state current)
     (if (eq? class 'this) (unbox (get_from_layers current state))
