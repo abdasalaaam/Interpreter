@@ -34,19 +34,23 @@
 (define runmain
   (lambda (classname state return)
     (block (cadr (getStaticMethod 'main classname state)) (add_top state) '() '() '() return classname)))
-
+    
+;creates instance closures in the order: instance class > instance field values
 (define makeInstanceClosure
   (lambda (line state)
     (list (cdr line) (cadr (unbox (get_from_layers (cadr line) state))))))
 
+;Adds a class binded to its closure to the M_state by using the classClosure helper class
 (define create_class
   (lambda (name line state)
     (Add_M_state name (makeClassClosure line) state)))
 
+;creates class closures in the order: super class > fields & values > methods > static methods
 (define makeClassClosure
   (lambda (body)
     (list (pullSuper body) (findItems 'var (cadddr body) initialstate) (findItems 'function (cadddr body) initialstate) (findItems 'static-function (cadddr body) initialstate))))
 
+;Helper function to pull the keywords out of class bodies: 'var, 'function, 'static-function
 ;used in defining the class closure. searches through the class body and locates all M_state instantiations - variables or nonstatic/static methods
 ;then adds those instantiations into an empty state for creation of many states within the class closure.
 (define findItems
@@ -56,6 +60,7 @@
       ((eq? (caar body) item) (findItems item (cdr body) (M_state (car body) state '() '() '() '() '())))
       (else (findItems item (cdr body) state)))))
 
+;Pulls the super class from a class definition
 (define pullSuper
   (lambda (classline)
     (cond
