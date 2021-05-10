@@ -170,10 +170,11 @@
   (lambda (name param state break throw continue return current)
     (block (findClassMethodBody name state (checkCurrent current name))
            (addActParams (findMethodParams name state (checkCurrent current name)) param state
-                         (add_top (createfunc (getDotName name) (findMethodParams name state (checkCurrent current name))
+                         (add_top (Add_M_state current (unbox (get_from_layers current state))
+                                               (createfunc (getDotName name) (findMethodParams name state (checkCurrent current name))
                                                                                   (findClassMethodBody name state (checkCurrent current name))
                                                                                   (findClosureState name state (checkCurrent current name))
-                                                                                  (findMethodClass name state (checkCurrent current name)))))
+                                                                                  (findMethodClass name state (checkCurrent current name))))))
            break throw continue return current)))
 
 (define checkCurrent
