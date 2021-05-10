@@ -45,10 +45,13 @@
   (lambda (name line state)
     (Add_M_state name (makeClassClosure line) state)))
 
+;returns the class body used for finding the m_state calls within a class
+(define class-body cadddr)
+
 ;creates class closures in the order: super class > fields & values > methods > static methods
 (define makeClassClosure
   (lambda (body)
-    (list (pullSuper body) (findItems 'var (cadddr body) initialstate) (findItems 'function (cadddr body) initialstate) (findItems 'static-function (cadddr body) initialstate))))
+    (list (pullSuper body) (findItems 'var (class-body body) initialstate) (findItems 'function (class-body body) initialstate) (findItems 'static-function (class-body body) initialstate))))
 
 ;Helper function to pull the keywords out of class bodies: 'var, 'function, 'static-function
 ;used in defining the class closure. searches through the class body and locates all M_state instantiations - variables or nonstatic/static methods
