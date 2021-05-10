@@ -23,13 +23,14 @@
     (cond
       ((and (boolean? state) (eq? state #t)) 'true)
       ((boolean? state) 'false)
-      ((null? tree) (call/cc (lambda (return) (runmain classname state return))))
+      ((null? tree) (call/cc (lambda (return) (runmain classname state return)))) ;calls main at the end of first level definitions
       ((number? state) state)
       (else
        (call/cc
         (lambda (return)
        (evaluate-line (car tree) (cdr tree) (M_state line state '() '() '() return '()) classname)))))))
 
+;runs the main function by finding the static method main within the class in question
 (define runmain
   (lambda (classname state return)
     (block (cadr (getStaticMethod 'main classname state)) (add_top state) '() '() '() return classname)))
@@ -46,6 +47,8 @@
   (lambda (body)
     (list (pullSuper body) (findItems 'var (cadddr body) initialstate) (findItems 'function (cadddr body) initialstate) (findItems 'static-function (cadddr body) initialstate))))
 
+;used in defining the class closure. searches through the class body and locates all M_state instantiations - variables or nonstatic/static methods
+;then adds those instantiations into an empty state for creation of many states within the class closure.
 (define findItems
   (lambda (item body state)
     (cond
@@ -61,11 +64,12 @@
       ((and (list? (car classline)) (eq? (caar classline) 'extends))  (cons (cdar classline) '()))
       (else                        (pullSuper (cdr classline))))))
 
-;gets the main function body from the state
+;returns a static method's closure from within the class closure. used in calling the main function.
 (define getStaticMethod
   (lambda (name classname state)
     (unbox (get_from_layers name (cadddr (unbox (get_from_layers classname state)))))))
 
+;returns a nonstatic method's closure from within the class closure
 (define getNonStaticMethod
   (lambda (name classname state)
     (unbox (get_from_layers name (caddr (unbox (get_from_layers classname state)))))))
@@ -166,17 +170,20 @@
 ;(list of super) (list of variables) (list of methods) (list of static methods)
 
 ;calls a function by calling block on the closure with the function added to that specific closure
+;uses the scope at function definition by adding the function to the top of the state at the function definition
+;uses this by adding the current class to the top of the state at function definition
 (define callfunc
   (lambda (name param state break throw continue return current)
     (block (findClassMethodBody name state (checkCurrent current name))
-           (addActParams (findMethodParams name state (checkCurrent current name)) param state
-                         (add_top (Add_M_state current (unbox (get_from_layers current state))
+           (addActParams (findMethodParams name state (checkCurrent current name)) param state                  
+                         (add_top (Add_M_state current (unbox (get_from_layers current state))   
                                                (createfunc (getDotName name) (findMethodParams name state (checkCurrent current name))
                                                                                   (findClassMethodBody name state (checkCurrent current name))
                                                                                   (findClosureState name state (checkCurrent current name))
                                                                                   (findMethodClass name state (checkCurrent current name))))))
            break throw continue return current)))
 
+;helper method used to differentiate between the class that a function is defined in and the class that resembles this on the left side of a dot operator
 (define checkCurrent
   (lambda (outsideClass functionToCall)
     (if (not (pair? functionToCall)) outsideClass
@@ -187,6 +194,7 @@
     (if (not (pair? name)) name
         (caddr name))))
 
+;finds the parameters for a method that was defined in a class. searches through class closure and finds method closure to do so
 (define findMethodParams
   (lambda (expression state current)
     (cond
@@ -194,6 +202,7 @@
       ((eq? (car expression) 'dot) (car (getNonStaticMethod (caddr expression) (caar (getInstanceClosure (cadr expression) state current)) state)))
       (else expression))))
 
+;finds the body for a method that was defined in a class
 (define findClassMethodBody
   (lambda (expression state current)
     (cond
@@ -201,6 +210,7 @@
       ((eq? (car expression) 'dot) (cadr (getNonStaticMethod (caddr expression) (caar (getInstanceClosure (cadr expression) state current)) state)))
       (else expression))))
 
+;finds the state that was at function definition for a function that was defined in a class
 (define findClosureState
   (lambda (expression state current)
     (cond
@@ -208,6 +218,7 @@
       ((eq? (car expression) 'dot) (caddr (getNonStaticMethod (caddr expression) (caar (getInstanceClosure (cadr expression) state current)) state)))
       (else expression))))
 
+;finds the class that the specific method is defined in
 (define findMethodClass
   (lambda (expression state current)
     (cond
@@ -246,25 +257,10 @@
   (lambda (name state)
     (caddr (unbox (get_from_layers name state)))))
 
+;gets the class that the method is defined in
 (define getMethodClass
   (lambda (name state)
     (cadddr (unbox (get_from_layers name state)))))
-
-;removes a variable and its corresponding value from the state by calling the remove function
-(define Remove_M_state
-  (lambda (name state)
-    (cond
-      ((null? state) '())
-      ((is_declared name (caar state)) (cons (remove name (caar state) (cadar state) '() '()) (cdr state)))
-      (else (Remove_M_state name (cdr state))))))
-
-;helper function to remove a variable from state list, if variable isn't found then the original state is returned from a saved list
-(define remove
-  (lambda (name declare-list value-list saved-declare saved-value)
-    (cond
-      ((null? declare-list) (list saved-declare saved-value))
-      ((eq? name (curr-value declare-list)) (list (append saved-declare (next-value declare-list)) (append saved-value (next-value value-list))))
-      (else (remove name (next-value declare-list) (next-value value-list) (cons (curr-value declare-list) saved-declare) (cons (curr-value value-list) saved-value))))))
 
 ;recursively reads and returns the MState of lines between brackets/ inside begin statements
 (define block
@@ -445,7 +441,8 @@
       ((eq? (operator expression) 'new)     (makeInstanceClosure expression state))
       ((eq? (operator expression) 'dot)     (M_value (rightoperand expression) (cadr (getInstanceClosure (leftoperand expression) state current)) break throw continue return current))
       (else (M_boolean expression state break throw continue return current))))) ;if the value of expression is either a boolean test (like >=) or if the expression is invalid
-  
+
+;retunrs the instance closure for a certain instance
 (define getInstanceClosure
   (lambda (class state current)
     (if (eq? class 'this) (unbox (get_from_layers current state))
